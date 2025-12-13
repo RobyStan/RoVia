@@ -1,0 +1,6 @@
+@RoVia.API_HostAddress = http://localhost:5144
+
+GET {{RoVia.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
