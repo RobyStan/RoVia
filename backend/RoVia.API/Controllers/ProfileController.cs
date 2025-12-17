@@ -37,4 +37,12 @@ public class ProfileController : ControllerBase
 
         return Ok(profile);
     }
+
+    [AllowAnonymous]
+    [HttpGet("leaderboard")]
+    public async Task<IActionResult> GetLeaderboard([FromQuery] int take = 50)
+    {
+        var leaderboard = await _profileService.GetLeaderboardAsync(take);
+        return Ok(leaderboard);
+    }
 }

@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using RoVia.API.Data;
+using RoVia.API.DTOs;
 using RoVia.API.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -127,6 +131,62 @@ public class ProfileService
         }
 
         await _context.SaveChangesAsync();
+    }
+
+    public async Task<IReadOnlyList<LeaderboardEntryDto>> GetLeaderboardAsync(int take = 50)
+    {
+        var cappedTake = Math.Clamp(take, 1, 100);
+
+        var topUsers = await _context.Users
+            .OrderByDescending(u => u.TotalPoints)
+            .ThenBy(u => u.CreatedAt)
+            .Take(cappedTake)
+            .Select(u => new { u.Id, u.Username, u.TotalPoints, u.CreatedAt })
+            .ToListAsync();
+
+        if (topUsers.Count == 0)
+        {
+            return Array.Empty<LeaderboardEntryDto>();
+        }
+
+        var userIds = topUsers.Select(u => u.Id).ToList();
+
+        var completionLookup = await _context.UserProgresses
+            .Where(up => userIds.Contains(up.UserId) && up.IsCompleted)
+            .GroupBy(up => up.UserId)
+            .Select(g => new
+            {
+                UserId = g.Key,
+                Count = g.Count(),
+                LastCompletedAt = g.Max(x => x.CompletedAt)
+            })
+            .ToDictionaryAsync(x => x.UserId, x => (x.Count, x.LastCompletedAt));
+
+        var leaderboard = new List<LeaderboardEntryDto>(topUsers.Count);
+
+        for (var index = 0; index < topUsers.Count; index++)
+        {
+            var user = topUsers[index];
+            var levelInfo = CalculateLevel(user.TotalPoints);
+            completionLookup.TryGetValue(user.Id, out var progressSnapshot);
+
+            leaderboard.Add(new LeaderboardEntryDto
+            {
+                UserId = user.Id,
+                Username = user.Username,
+                TotalPoints = user.TotalPoints,
+                Level = levelInfo.Level,
+                LevelName = levelInfo.Name,
+                LevelProgress = levelInfo.Progress,
+                PointsToNextLevel = levelInfo.PointsToNextLevel,
+                Rank = index + 1,
+                QuizzesCompleted = progressSnapshot.Count,
+                LastCompletedAt = progressSnapshot.LastCompletedAt,
+                JoinedAt = user.CreatedAt
+            });
+        }
+
+        return leaderboard;
     }
 
     private static LevelInfo CalculateLevel(int totalPoints)

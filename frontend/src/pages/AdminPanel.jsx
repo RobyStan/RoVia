@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import adminService from '../services/adminService';
+import { REGION_LIST } from '../constants/regions';
 
 const STATUS_FILTERS = ['Pending', 'Approved', 'Rejected'];
 const STATUS_FROM_ENUM = {
@@ -849,12 +850,16 @@ function AdminPanel() {
                 </div>
                 <div>
                   <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)' }}>Regiune</label>
-                  <input
-                    type="text"
+                  <select
                     value={attractionForm.region}
                     onChange={(e) => handleAttractionFieldChange('region', e.target.value)}
                     style={{ width: '100%', marginTop: 6, padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--topbar-bg)', color: 'var(--text)' }}
-                  />
+                  >
+                    <option value="">Selectează regiunea</option>
+                    {REGION_LIST.map((region) => (
+                      <option key={region} value={region}>{region}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -976,7 +981,7 @@ function AdminPanel() {
                   onClick={loadAttractions}
                   style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '0 16px', background: 'var(--topbar-bg)', color: 'var(--text)', fontWeight: 600, cursor: 'pointer' }}
                 >
-                  Sync
+                  Reîncarcare
                 </button>
               </div>
               {managedAttraction && (

@@ -177,7 +177,7 @@ function QuizPage() {
     <div style={{ position: 'relative', height: '100vh', overflow: 'auto' }}>
       <TopBar onMenuToggle={() => setSidebarOpen(!sidebarOpen)} userName="User" />
 
-      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div style={{ paddingTop: '80px', paddingLeft: sidebarOpen ? '250px' : '0', transition: 'padding-left 0.3s' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px' }}>

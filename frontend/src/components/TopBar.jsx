@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 
-function TopBar({ onMenuToggle }) {
+function TopBar({ onMenuToggle, sidebarWidth = 72 }) {
 	const navigate = useNavigate();
 	const auth = useAuth();
 	const username = useMemo(() => auth.username || 'Explorer', [auth.username]);
@@ -34,7 +34,7 @@ function TopBar({ onMenuToggle }) {
 		<div style={{
 			position: 'fixed',
 			top: 0,
-			left: 72,
+			left: sidebarWidth,
 			right: 0,
 			height: '56px',
 			display: 'flex',

@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import profileService from '../services/profileService';
+import useAuth from '../hooks/useAuth';
+import { getWalletKey, getActiveRedemptions, calculateSpentPoints } from '../utils/voucherWallet';
 
 function UserProfile() {
     const navigate = useNavigate();
+    const auth = useAuth();
+    const walletKey = getWalletKey(auth);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [voucherRedemptions, setVoucherRedemptions] = useState({});
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -77,6 +82,13 @@ function UserProfile() {
         loadProfile();
     }, [navigate]);
 
+    useEffect(() => {
+        const syncWallet = () => setVoucherRedemptions(getActiveRedemptions(walletKey));
+        syncWallet();
+        window.addEventListener('storage', syncWallet);
+        return () => window.removeEventListener('storage', syncWallet);
+    }, [walletKey]);
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         navigate('/login');
@@ -102,6 +114,8 @@ function UserProfile() {
         return null;
     }
 
+    const voucherSpentPoints = calculateSpentPoints(voucherRedemptions);
+    const availablePoints = Math.max(0, (profile.totalPoints ?? 0) - voucherSpentPoints);
     const initials = profile.name?.charAt(0)?.toUpperCase() ?? '?';
     const progressPercent = Math.round((profile.levelProgress || 0) * 100);
     const badgesUnlocked = profile.badges.length;
@@ -129,8 +143,11 @@ function UserProfile() {
                         <p style={{ margin: 0, color: 'var(--muted)' }}>📧 {profile.email}</p>
                     </div>
                     <div style={{ textAlign: 'right', minWidth: '200px' }}>
-                        <p style={{ margin: 0, color: 'var(--muted)', fontSize: '13px' }}>TOTAL PUNCTE</p>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '36px', fontWeight: 'bold', color: '#16a34a' }}>{profile.totalPoints}</p>
+                        <p style={{ margin: 0, color: 'var(--muted)', fontSize: '13px' }}>PUNCTE DISPONIBILE</p>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '36px', fontWeight: 'bold', color: '#16a34a' }}>{availablePoints}</p>
+                        {voucherSpentPoints > 0 && (
+                            <p style={{ margin: '4px 0 0 0', color: '#ca8a04', fontSize: '12px' }}>+{voucherSpentPoints}p rezervate în vouchere</p>
+                        )}
                         <p style={{ margin: 0, color: 'var(--muted)', fontSize: '13px' }}>Nivel: {profile.levelName} #{profile.level}</p>
                     </div>
                 </div>
@@ -139,10 +156,15 @@ function UserProfile() {
             {/* Statistici */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                 {[{
-                    label: 'Puncte acumulate',
-                    value: profile.totalPoints,
+                    label: 'Puncte disponibile',
+                    value: availablePoints,
                     icon: '🏆',
                     accent: '#fef3c7'
+                }, {
+                    label: 'Puncte rezervate',
+                    value: voucherSpentPoints,
+                    icon: '🎁',
+                    accent: '#fef9c3'
                 }, {
                     label: 'Quiz-uri completate',
                     value: profile.quizzesCompleted,

@@ -35,8 +35,11 @@ public class AttractionsController : ControllerBase
         if (filter.Type.HasValue)
             query = query.Where(a => a.Type == filter.Type.Value);
 
-        if (!string.IsNullOrEmpty(filter.Region))
-            query = query.Where(a => a.Region.Contains(filter.Region));
+        if (!string.IsNullOrWhiteSpace(filter.Region))
+        {
+            var normalizedRegion = filter.Region.Trim().ToLower();
+            query = query.Where(a => a.Region != null && a.Region.ToLower() == normalizedRegion);
+        }
 
         if (filter.MinRating.HasValue)
             query = query.Where(a => a.Rating >= filter.MinRating.Value);

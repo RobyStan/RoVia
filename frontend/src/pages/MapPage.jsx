@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { GoogleMap, Marker, InfoWindow, useLoadScript } from '@react-google-maps/api';
+import { GoogleMap, Marker, InfoWindow, Polygon, useLoadScript } from '@react-google-maps/api';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { REGION_LIST, REGION_POLYGONS } from '../constants/regions';
 
 const TYPE_LABELS = {
     1: 'Naturală',
@@ -104,13 +105,37 @@ export default function MapPage() {
         fetchAttractions();
     }, [filters]);
 
-    const regionOptions = useMemo(() => {
-        const pool = (catalog.length ? catalog : attractions)
-            .map(a => (a.region || '').trim())
-            .filter(Boolean);
-        const unique = Array.from(new Set(pool));
-        return unique.sort((a, b) => a.localeCompare(b, 'ro'));
-    }, [catalog, attractions]);
+    const regionOptions = REGION_LIST;
+    const highlightedRegion = filtersDraft.region || filters.region;
+    const highlightedPaths = highlightedRegion ? REGION_POLYGONS[highlightedRegion] : null;
+    const highlightedPolygonOptions = useMemo(() => ({
+        strokeColor: isDark ? '#60a5fa' : '#2563eb',
+        fillColor: isDark ? 'rgba(96,165,250,0.2)' : 'rgba(37,99,235,0.22)',
+        fillOpacity: 0.25,
+        strokeWeight: 2,
+        strokeOpacity: 0.9
+    }), [isDark]);
+
+    const filterTheme = useMemo(() => ({
+        cardBg: isDark
+            ? 'linear-gradient(135deg, rgba(15,23,42,0.82), rgba(30,64,175,0.78))'
+            : 'linear-gradient(135deg, rgba(255,255,255,0.95), rgba(248,250,252,0.88))',
+        secondaryCardBg: isDark ? 'rgba(15,23,42,0.65)' : 'rgba(248,250,252,0.92)',
+        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)',
+        text: isDark ? '#f8fafc' : '#0f172a',
+        muted: isDark ? 'rgba(255,255,255,0.72)' : '#64748b',
+        chipBg: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.08)',
+        chipText: isDark ? '#f8fafc' : '#0f172a',
+        fieldBg: isDark ? 'rgba(15,23,42,0.35)' : 'rgba(255,255,255,0.95)',
+        fieldBorder: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.12)',
+        fieldText: isDark ? '#f8fafc' : '#0f172a',
+        buttonGradient: isDark ? 'linear-gradient(135deg, #60a5fa, #2563eb)' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+        buttonShadow: isDark ? '0 12px 24px rgba(37, 99, 235, 0.35)' : '0 18px 36px rgba(37, 99, 235, 0.18)',
+        buttonHoverShadow: isDark ? '0 18px 36px rgba(37, 99, 235, 0.45)' : '0 22px 44px rgba(37, 99, 235, 0.25)',
+        helperText: isDark ? 'rgba(255,255,255,0.78)' : '#475569',
+        accent: isDark ? '#60a5fa' : '#2563eb',
+        cardShadow: isDark ? '0 20px 45px rgba(15, 23, 42, 0.35)' : '0 18px 40px rgba(15, 23, 42, 0.14)'
+    }), [isDark]);
 
     const sortedAttractions = useMemo(() => {
         const direction = sortOrder === 'asc' ? 1 : -1;
@@ -675,26 +700,27 @@ export default function MapPage() {
                     <div
                         style={{
                             pointerEvents: 'auto',
-                            background: 'linear-gradient(135deg, rgba(15,23,42,0.82), rgba(30,64,175,0.78))',
+                            background: filterTheme.cardBg,
                             borderRadius: '18px',
                             padding: '20px',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            color: 'white',
-                            boxShadow: '0 20px 45px rgba(15, 23, 42, 0.35)'
+                            border: `1px solid ${filterTheme.borderColor}`,
+                            color: filterTheme.text,
+                            boxShadow: filterTheme.cardShadow,
+                            backdropFilter: 'blur(14px)'
                         }}
                     >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
                         <div>
-                            <p style={{ margin: 0, fontSize: '13px', opacity: 0.8 }}>Salut, {userName}</p>
-                            <h2 style={{ margin: 0, fontSize: '20px' }}>Rafinare atracții</h2>
+                            <p style={{ margin: 0, fontSize: '13px', color: filterTheme.muted }}>Salut, {userName}</p>
+                            <h2 style={{ margin: 0, fontSize: '20px', color: filterTheme.text }}>Rafinare atracții</h2>
                         </div>
                         <button
                             type="button"
                             onClick={handleResetFilters}
                             style={{
-                                border: '1px solid rgba(255,255,255,0.4)',
+                                border: `1px solid ${filterTheme.fieldBorder}`,
                                 background: 'transparent',
-                                color: 'white',
+                                color: filterTheme.text,
                                 borderRadius: '999px',
                                 padding: '6px 14px',
                                 cursor: 'pointer',
@@ -712,10 +738,11 @@ export default function MapPage() {
                                     <span
                                         key={chip}
                                         style={{
-                                            background: 'rgba(255,255,255,0.15)',
+                                            background: filterTheme.chipBg,
                                             borderRadius: '999px',
                                             padding: '4px 12px',
-                                            fontSize: '12px'
+                                            fontSize: '12px',
+                                            color: filterTheme.chipText
                                         }}
                                     >
                                         {chip}
@@ -723,14 +750,14 @@ export default function MapPage() {
                                 ))}
                             </div>
                         ) : (
-                            <p style={{ margin: 0, fontSize: '13px', opacity: 0.65 }}>
+                            <p style={{ margin: 0, fontSize: '13px', color: filterTheme.helperText }}>
                                 {hasSearched ? 'Nu există filtre active' : 'Completează filtrele și apasă „Caută atracții”.'}
                             </p>
                         )}
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 500 }}>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 500, color: filterTheme.text }}>
                             <span>Tip atracție</span>
                             <select
                                 name="type"
@@ -738,21 +765,21 @@ export default function MapPage() {
                                 onChange={handleDraftFilterChange}
                                 style={{
                                     borderRadius: '12px',
-                                    border: '1px solid rgba(255,255,255,0.4)',
+                                    border: `1px solid ${filterTheme.fieldBorder}`,
                                     padding: '10px',
-                                    background: 'rgba(15,23,42,0.35)',
-                                    color: 'white'
+                                    background: filterTheme.fieldBg,
+                                    color: filterTheme.fieldText
                                 }}
                             >
                                 {TYPE_OPTIONS.map(option => (
-                                    <option key={option.value || 'all'} value={option.value} style={{ color: '#111827' }}>
+                                    <option key={option.value || 'all'} value={option.value} style={{ color: '#0f172a' }}>
                                         {option.label}
                                     </option>
                                 ))}
                             </select>
                         </label>
 
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 500 }}>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 500, color: filterTheme.text }}>
                             <span>Regiune</span>
                             <select
                                 name="region"
@@ -760,22 +787,22 @@ export default function MapPage() {
                                 onChange={handleDraftFilterChange}
                                 style={{
                                     borderRadius: '12px',
-                                    border: '1px solid rgba(255,255,255,0.4)',
+                                    border: `1px solid ${filterTheme.fieldBorder}`,
                                     padding: '10px',
-                                    background: 'rgba(15,23,42,0.35)',
-                                    color: 'white'
+                                    background: filterTheme.fieldBg,
+                                    color: filterTheme.fieldText
                                 }}
                             >
-                                <option value="" style={{ color: '#111827' }}>Toate regiunile</option>
+                                <option value="" style={{ color: '#0f172a' }}>Toate regiunile</option>
                                 {regionOptions.map(region => (
-                                    <option key={region} value={region} style={{ color: '#111827' }}>
+                                    <option key={region} value={region} style={{ color: '#0f172a' }}>
                                         {region}
                                     </option>
                                 ))}
                             </select>
                         </label>
 
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 500 }}>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', fontWeight: 500, color: filterTheme.text }}>
                             <span>Rating minim</span>
                             <select
                                 name="minRating"
@@ -783,14 +810,14 @@ export default function MapPage() {
                                 onChange={handleDraftFilterChange}
                                 style={{
                                     borderRadius: '12px',
-                                    border: '1px solid rgba(255,255,255,0.4)',
+                                    border: `1px solid ${filterTheme.fieldBorder}`,
                                     padding: '10px',
-                                    background: 'rgba(15,23,42,0.35)',
-                                    color: 'white'
+                                    background: filterTheme.fieldBg,
+                                    color: filterTheme.fieldText
                                 }}
                             >
                                 {RATING_PRESETS.map(option => (
-                                    <option key={option.value || 'all'} value={option.value} style={{ color: '#111827' }}>
+                                    <option key={option.value || 'all'} value={option.value} style={{ color: '#0f172a' }}>
                                         {option.label}
                                     </option>
                                 ))}
@@ -805,28 +832,30 @@ export default function MapPage() {
                             style={{
                                 borderRadius: '14px',
                                 border: 'none',
-                                background: 'linear-gradient(135deg, #60a5fa, #2563eb)',
+                                background: filterTheme.buttonGradient,
                                 color: 'white',
                                 padding: '12px 18px',
                                 fontSize: '15px',
                                 fontWeight: 600,
                                 cursor: loading ? 'not-allowed' : 'pointer',
                                 transition: 'transform 160ms ease, box-shadow 160ms ease',
-                                boxShadow: '0 12px 24px rgba(37, 99, 235, 0.35)',
+                                boxShadow: filterTheme.buttonShadow,
                                 opacity: loading ? 0.65 : 1
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 16px 32px rgba(37, 99, 235, 0.45)';
+                                e.currentTarget.style.boxShadow = filterTheme.buttonHoverShadow;
+                                e.currentTarget.style.background = `linear-gradient(135deg, ${filterTheme.accent}, ${filterTheme.accent})`;
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 12px 24px rgba(37, 99, 235, 0.35)';
+                                e.currentTarget.style.boxShadow = filterTheme.buttonShadow;
+                                e.currentTarget.style.background = filterTheme.buttonGradient;
                             }}
                         >
                             Caută atracții
                         </button>
-                        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.78)' }}>
+                        <span style={{ fontSize: '12px', color: filterTheme.helperText }}>
                             {!hasSearched
                                 ? 'Rezultatele vor apărea imediat ce pornești prima căutare.'
                                 : hasPendingChanges
@@ -841,11 +870,11 @@ export default function MapPage() {
                     <div
                         style={{
                             pointerEvents: 'auto',
-                            background: 'rgba(15,23,42,0.65)',
+                            background: filterTheme.secondaryCardBg,
                             borderRadius: '16px',
                             padding: '18px',
-                            border: '1px dashed rgba(255,255,255,0.25)',
-                            color: 'white',
+                            border: `1px dashed ${filterTheme.borderColor}`,
+                            color: filterTheme.text,
                             fontSize: '14px'
                         }}
                     >
@@ -1042,6 +1071,12 @@ export default function MapPage() {
                     center={{ lat: 45.9432, lng: 24.9668 }}
                     options={mapOptions}
                 >
+                    {highlightedPaths?.length && (
+                        <Polygon
+                            paths={highlightedPaths}
+                            options={highlightedPolygonOptions}
+                        />
+                    )}
                     {sortedAttractions.map(attraction => (
                         <Marker
                             key={attraction.id}

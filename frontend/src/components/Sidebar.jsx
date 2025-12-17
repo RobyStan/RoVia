@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useAuth, { emitAuthChange } from '../hooks/useAuth';
+import api from '../services/api';
 
 const Icon = ({ name }) => {
   const icons = {
@@ -13,11 +14,37 @@ const Icon = ({ name }) => {
     admin: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 1l3.09 6.26L22 7.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 1z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     logout: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M16 17l5-5-5-5M21 12H9M3 5v14a2 2 0 002 2h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
     chevron: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+    gift: <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 9h18v11a1 1 0 01-1 1H4a1 1 0 01-1-1V9z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 9h18M12 9v12M5 5.5c0 1.2.8 2.5 2 2.5s2-1.3 2-2.5S8.8 3 7 3 5 4.3 5 5.5zM15 5.5c0 1.2.8 2.5 2 2.5s2-1.3 2-2.5S19.2 3 17 3s-2 1.3-2 2.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   };
   return icons[name] || null;
 };
 
-export default function Sidebar({ isOpen, onToggle, onClose }) {
+const REGION_ICON_META = {
+  Muntenia: { icon: '🏛️', color: '#f97316' },
+  Transilvania: { icon: '🏔️', color: '#a855f7' },
+  Moldova: { icon: '🌄', color: '#0ea5e9' },
+  Banat: { icon: '🌿', color: '#22c55e' },
+  Dobrogea: { icon: '🌊', color: '#06b6d4' },
+  Maramureș: { icon: '🪵', color: '#ef4444' },
+  Neamț: { icon: '⛰️', color: '#3b82f6' },
+  Alba: { icon: '🏰', color: '#eab308' }
+};
+
+const DEFAULT_REGION_ICON = { icon: '🗺️', color: '#2563eb' };
+
+const TYPE_LABELS = {
+  1: 'Naturală',
+  2: 'Culturală',
+  3: 'Istorică',
+  4: 'Distracție',
+  5: 'Religioasă'
+};
+
+const formatRating = (value) => (value ?? 0).toFixed(1);
+
+const getRegionPalette = (region) => REGION_ICON_META[region] || DEFAULT_REGION_ICON;
+
+export default function Sidebar({ isOpen, onClose }) {
   const navigate = useNavigate();
   const location = useLocation();
   const auth = useAuth();
@@ -39,8 +66,54 @@ export default function Sidebar({ isOpen, onToggle, onClose }) {
   const navItems = [
     { icon: 'home', label: 'Acasă', to: '/map' },
     { icon: 'trophy', label: 'Clasament', to: '/leaderboard' },
+    { icon: 'gift', label: 'Vouchere', to: '/rewards' },
     { icon: 'mail', label: 'Contact', to: '/contact' },
   ];
+
+  const [regionData, setRegionData] = useState({});
+  const [regionsLoading, setRegionsLoading] = useState(true);
+  const [regionsError, setRegionsError] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchRegions = async () => {
+      try {
+        setRegionsError(null);
+        const response = await api.get('/attractions');
+        if (!isMounted) return;
+
+        const grouped = response.data.reduce((acc, attraction) => {
+          const regionName = attraction.region || 'Fără regiune';
+          if (!acc[regionName]) acc[regionName] = [];
+          acc[regionName].push(attraction);
+          return acc;
+        }, {});
+
+        const limited = Object.fromEntries(
+          Object.entries(grouped).map(([regionName, items]) => {
+            const sorted = [...items].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+            return [regionName, sorted.slice(0, 3)];
+          })
+        );
+
+        setRegionData(limited);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Nu am putut încărca atracțiile pentru sidebar:', error);
+        setRegionsError('Nu am putut încărca regiunile. Reîncearcă mai târziu.');
+      } finally {
+        if (isMounted) setRegionsLoading(false);
+      }
+    };
+
+    fetchRegions();
+    return () => { isMounted = false; };
+  }, []);
+
+  const regionNames = useMemo(() => (
+    Object.keys(regionData).sort((a, b) => a.localeCompare(b, 'ro'))
+  ), [regionData]);
 
   const containerStyle = {
     position: 'fixed',
@@ -88,30 +161,9 @@ export default function Sidebar({ isOpen, onToggle, onClose }) {
 
   return (
     <div style={containerStyle}>
-      {/* Header cu logo și toggle */}
-      <div style={{ padding: '16px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {isOpen && <span style={{ fontWeight: 700, fontSize: 18, color: 'var(--accent)' }}>RoVia</span>}
-        <button
-          onClick={onToggle}
-          aria-label="toggle menu"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text)',
-            borderRadius: 8
-          }}
-        >
-          {isOpen ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-          )}
-        </button>
+      {/* Header cu logo */}
+      <div style={{ padding: '16px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: isOpen ? 'space-between' : 'center' }}>
+        <span style={{ fontWeight: 700, fontSize: isOpen ? 18 : 16, color: 'var(--accent)' }}>{isOpen ? 'RoVia' : 'RV'}</span>
       </div>
 
       {/* Navigare principală */}
@@ -190,48 +242,110 @@ export default function Sidebar({ isOpen, onToggle, onClose }) {
         {isOpen && (
           <>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Regiuni Turistice</span>
-            <details style={{ cursor: 'pointer' }}>
-              <summary style={{
-                padding: '10px 12px',
+            {regionsLoading && (
+              <div style={{
+                padding: '12px',
                 borderRadius: 10,
-                background: 'var(--topbar-bg)',
-                border: '1px solid var(--border)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                fontWeight: 500,
-                userSelect: 'none',
-                color: 'var(--text)'
+                border: '1px dashed var(--border)',
+                color: 'var(--muted)',
+                fontSize: 13
               }}>
-                <span>📍 Muntenia</span>
-                <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>3</span>
-              </summary>
-              <div style={{ padding: '8px 4px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  { name: 'Palatul Parlamentului', city: 'București' },
-                  { name: 'Castelul Peleș', city: 'Sinaia' },
-                  { name: 'Mănăstirea Snagov', city: 'Snagov' }
-                ].map((attr, i) => (
-                  <div key={i} style={{
-                    borderRadius: 8,
-                    background: 'var(--topbar-bg)',
-                    padding: '10px 12px',
-                    display: 'flex',
-                    gap: 10,
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 200ms ease',
-                    border: '1px solid var(--border)'
-                  }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--topbar-bg)'; }}>
-                    <div style={{ width: 32, height: 32, background: 'var(--accent)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>🎯</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{attr.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>{attr.city}</div>
-                    </div>
-                  </div>
-                ))}
+                Se încarcă regiunile...
               </div>
-            </details>
+            )}
+            {!regionsLoading && regionsError && (
+              <div style={{
+                padding: '12px',
+                borderRadius: 10,
+                border: '1px solid rgba(239,68,68,0.4)',
+                background: 'rgba(239,68,68,0.08)',
+                color: '#b91c1c',
+                fontSize: 13
+              }}>
+                {regionsError}
+              </div>
+            )}
+            {!regionsLoading && !regionsError && !regionNames.length && (
+              <div style={{
+                padding: '12px',
+                borderRadius: 10,
+                border: '1px dashed var(--border)',
+                color: 'var(--muted)',
+                fontSize: 13
+              }}>
+                Încă nu există atracții aprobate pentru afișare.
+              </div>
+            )}
+            {!regionsLoading && !regionsError && regionNames.map((region, idx) => {
+              const attractions = regionData[region] || [];
+              const palette = getRegionPalette(region);
+
+              return (
+                <details key={region} style={{ cursor: 'pointer' }} defaultOpen={idx === 0}>
+                  <summary style={{
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    background: 'var(--topbar-bg)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    fontWeight: 500,
+                    userSelect: 'none',
+                    color: 'var(--text)'
+                  }}>
+                    <span>{palette.icon} {region}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>{attractions.length}</span>
+                  </summary>
+                  <div style={{ padding: '8px 4px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {attractions.map((attraction) => (
+                      <div
+                        key={attraction.id}
+                        style={{
+                          borderRadius: 10,
+                          background: 'var(--topbar-bg)',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          gap: 10,
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 200ms ease',
+                          border: '1px solid var(--border)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(37, 99, 235, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'var(--topbar-bg)';
+                        }}
+                        onClick={() => navigate(`/attractions/${attraction.id}`)}
+                      >
+                        <div style={{
+                          width: 34,
+                          height: 34,
+                          background: palette.color,
+                          borderRadius: 10,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          fontWeight: 600,
+                          fontSize: 16
+                        }}>
+                          {palette.icon}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{attraction.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                            ⭐ {formatRating(attraction.rating)} • {TYPE_LABELS[Number(attraction.type)] || 'Atracție'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              );
+            })}
           </>
         )}
       </div>

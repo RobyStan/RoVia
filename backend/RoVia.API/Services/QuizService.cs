@@ -237,6 +237,14 @@ public class QuizService
             throw new InvalidOperationException("Nu poți șterge acest quiz.");
         }
 
+        var progressEntries = await _context.UserProgresses
+            .Where(up => up.QuizId == quizId)
+            .ToListAsync();
+        if (progressEntries.Count > 0)
+        {
+            _context.UserProgresses.RemoveRange(progressEntries);
+        }
+
         _context.Quizzes.Remove(quiz);
         await _context.SaveChangesAsync();
         return true;

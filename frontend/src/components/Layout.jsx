@@ -46,7 +46,7 @@ function Layout({ children }) {
         <ErrorBoundary>
             <div style={{ display: 'flex', minHeight: '100vh', position: 'relative' }}>
                 {/* Sidebar is overlay now */}
-                <Sidebar isOpen={open} onToggle={() => { setOpen(p => !p); triggerResize(280); }} onClose={() => { setOpen(false); triggerResize(280); }} />
+                <Sidebar isOpen={open} onClose={() => { setOpen(false); triggerResize(280); }} />
 
                 {/* top header: fixed position, NOT moved by sidebar */}
                 <header className="topbar" style={{
